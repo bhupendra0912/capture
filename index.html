@@ -1,0 +1,143 @@
+
+
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Permission Based Capture</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    text-align: center;
+    background: #f2f4f7;
+  }
+  video, canvas {
+    width: 100%;
+    max-width: 360px;
+    border-radius: 12px;
+    background: #000;
+  }
+  button {
+    margin-top: 15px;
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: none;
+    background: #0d6efd;
+    color: #fff;
+  }
+  #status {
+    margin-top: 10px;
+    font-size: 14px;
+  }
+
+  /* 🔔 Permission Popup */
+  #permissionPopup {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .popupBox {
+    background: #fff;
+    padding: 20px;
+    width: 90%;
+    max-width: 320px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  .popupBox h3 {
+    margin-top: 0;
+  }
+  .popupBox button {
+    width: 100%;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>User Photo & Location</h2>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<button id="captureBtn" disabled>Capture & Upload</button>
+<p id="status"></p>
+
+<!-- 🔔 Permission Instruction Popup -->
+<div id="permissionPopup">
+  <div class="popupBox">
+    <h3>Permission Required</h3>
+    <p>
+      This page needs access to:
+      <br>📷 Camera
+      <br>📍 Location
+    </p>
+    <button onclick="requestPermissions()">Allow</button>
+  </div>
+</div>
+
+<script>
+const SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbwsVS_cKlGMkODiVQgdz2_LhkfFaS8mhQbTzS1h8pwc/exec";
+
+let stream;
+const video = document.getElementById("video");
+const statusText = document.getElementById("status");
+const captureBtn = document.getElementById("captureBtn");
+
+async function requestPermissions() {
+  try {
+    // 📷 Camera permission
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
+    video.srcObject = stream;
+
+    // 📍 Location permission
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        document.getElementById("permissionPopup").style.display = "none";
+        captureBtn.disabled = false;
+        statusText.innerText = "Permissions granted. You can capture now.";
+      },
+      () => alert("Location permission denied")
+    );
+  } catch (e) {
+    alert("Camera permission denied");
+  }
+}
+
+captureBtn.onclick = async () => {
+  const canvas = document.getElementById("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  const imageBase64 = canvas.toDataURL("image/png");
+  statusText.innerText = "Uploading...";
+
+  navigator.geolocation.getCurrentPosition(async pos => {
+    await fetch(SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        image: imageBase64,
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        time: new Date().toISOString()
+      })
+    });
+
+    statusText.innerText = "✅ Saved to Google Drive";
+  });
+};
+</script>
+
+</body>
+</html>
